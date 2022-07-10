@@ -3,15 +3,12 @@ import axios from "axios";
 import { GetServerSidePropsContext } from "next";
 import { getSession } from "next-auth/react";
 import {signOut} from "next-auth/react";
+import mongoose from "mongoose";
+import { UserModel } from "../models/user";
+import { Session } from "next-auth";
 
 export default function Index(props: {
-    session: {
-        user: {
-            email: string,
-            name: string,
-            image: string,
-        }
-    }
+    session: Session
 }) {
     const [newPostBody, setNewPostBody] = useState("");
     const [posts, setPosts] = useState<{body: string, _id: string}[]>([]);
@@ -61,6 +58,21 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     const session = await getSession(context);
 
     if (!session) return { redirect: { permanent: false, destination: "/signin" } };
+
+    try {
+        await mongoose.connect(process.env.MONGODB_URL as string);
+
+        const thisUser = await UserModel.findOne({email: session.user.email});
+
+        if (!thisUser) await UserModel.create({
+            email: session.user.email,
+            name: session.user.name,
+            image: session.user.image,
+        });
+    } catch (e) {
+        console.log(e);
+        return { notFound: true };
+    }
 
     return { props: {session: session} };
 }
